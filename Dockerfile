@@ -1,6 +1,7 @@
+# 使用官方 CUDA 镜像，适合 PyTorch 2.x 和 GPU 环境
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
-# 设置环境变量
+# 防止交互式安装
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
@@ -8,31 +9,33 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3.10 python3.10-venv python3-pip \
-        libgl1 \
         git \
         ffmpeg \
+        libgl1 \
+        gcc \
+        python3-dev \
         wget \
-        && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # 设置 python3.10 为默认
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 
-# 创建工作目录
+# 设置工作目录
 WORKDIR /workspace
 
-# 复制代码
+# 复制 requirements.txt 并安装依赖
+COPY requirements.txt .
+
+# 使用国内源加速，可选
+RUN pip3 install --upgrade pip && \
+    pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 复制项目所有文件
 COPY . .
 
-# 安装 Python 依赖
-RUN pip3 install --upgrade pip && \
-    pip3 install -r requirements.txt
+# 可选：下载模型权重（如有需要可自定义）
+# RUN python3 scripts/download_model.py
 
-# 下载模型权重（可选，或在启动脚本中下载）
-RUN pip3 install huggingface_hub && \
-    mkdir -p checkpoints && \
-    huggingface-cli download ByteDance/LatentSync-1.5 whisper/tiny.pt --local-dir checkpoints && \
-    huggingface-cli download ByteDance/LatentSync-1.5 latentsync_unet.pt --local-dir checkpoints
-
-# 默认启动命令（根据你的实际需求调整）
+# 默认启动命令（根据你的实际入口脚本调整）
 CMD ["python3", "gradio_app.py"]
 
